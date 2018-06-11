@@ -2,39 +2,31 @@
 #import <React/RCTImageLoader.h>
 #import "UIImage+ColorAtPixel.h"
 
+UIImage *tempImage;
+
 @implementation RNPixelColor
 
 @synthesize bridge = _bridge;
 
 RCT_EXPORT_MODULE();
 
-RCT_EXPORT_METHOD(getHex:(NSString *)path
-                  options:(NSDictionary *)options
+RCT_EXPORT_METHOD(createTempImage: (NSString *) path)
+{
+    [_bridge.imageLoader loadImageWithURLRequest:[RCTConvert NSURLRequest:path] callback:^(NSError *error, UIImage *image) {
+        tempImage = image;
+    }];
+}
+RCT_EXPORT_METHOD(getHex:(NSDictionary *)options
                   callback:(RCTResponseSenderBlock)callback)
 {
-
-    [_bridge.imageLoader loadImageWithURLRequest:[RCTConvert NSURLRequest:path] callback:^(NSError *error, UIImage *image) {
-        if (error || image == nil) { // if couldn't load from bridge create a new UIImage
-            if ([path hasPrefix:@"data:"] || [path hasPrefix:@"file:"]) {
-                NSURL *imageUrl = [[NSURL alloc] initWithString:path];
-                image = [UIImage imageWithData:[NSData dataWithContentsOfURL:imageUrl]];
-            } else {
-                image = [[UIImage alloc] initWithContentsOfFile:path];
-            }
-
-            if (image == nil) {
-                callback(@[@"Could not create image from given path.", @""]);
-                return;
-            }
-        }
- 
         NSInteger x = [RCTConvert NSInteger:options[@"x"]];
         NSInteger y = [RCTConvert NSInteger:options[@"y"]];
+       
         if (options[@"width"] && options[@"height"]) {
             NSInteger scaledWidth = [RCTConvert NSInteger:options[@"width"]];
             NSInteger scaledHeight = [RCTConvert NSInteger:options[@"height"]];
-            float originalWidth = image.size.width;
-            float originalHeight = image.size.height;
+            float originalWidth = tempImage.size.width;
+            float originalHeight = tempImage.size.height;
             
             x = x * (originalWidth / scaledWidth);
             y = y * (originalHeight / scaledHeight);
@@ -43,13 +35,15 @@ RCT_EXPORT_METHOD(getHex:(NSString *)path
         
         CGPoint point = CGPointMake(x, y);
         
-        UIColor *pixelColor = [image colorAtPixel:point];
+        UIColor *pixelColor = [tempImage colorAtPixel:point];
         callback(@[[NSNull null], hexStringForColor(pixelColor)]);
-     
-    }];
+   // }];
 }
 
 NSString * hexStringForColor( UIColor* color ) {
+    if (color == nil) {
+        return @"transparent";
+    }
     const CGFloat *components = CGColorGetComponents(color.CGColor);
     CGFloat r = components[0];
     CGFloat g = components[1];
